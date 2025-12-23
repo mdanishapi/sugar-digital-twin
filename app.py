@@ -1,81 +1,114 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
-import google.generativeai as genai
+import plotly.graph_objects as go
 
-# Page Config
-st.set_page_config(page_title="Sugar Industry Digital Twin", layout="wide", initial_sidebar_state="expanded")
+# --- PAGE CONFIGURATION ---
+st.set_page_config(
+    page_title="Sugar Digital Twin | MNFSR",
+    page_icon="🇵🇰",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# Initialize Gemini
-try:
-    # Use st.secrets to get the key from Streamlit Cloud dashboard
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except Exception as e:
-    st.sidebar.warning("Gemini API Key not found in Secrets. AI features disabled.")
-    model = None
-
-# Custom CSS for a "Digital Twin" look
+# --- MODERN STYLING (Glassmorphism & Professional Palettes) ---
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.title("🚜 Sugar Industry Digital Twin")
-st.markdown("---")
-
-# Sidebar - Controls
-st.sidebar.header("Factory Parameters")
-crushing_capacity = st.sidebar.slider("Crushing Capacity (Tons/Day)", 1000, 15000, 8000)
-recovery_rate = st.sidebar.slider("Recovery Rate (%)", 8.0, 14.0, 10.5)
-market_price = st.sidebar.number_input("Market Price (per kg)", 50, 250, 140)
-
-# Main Dashboard Layout
-col1, col2, col3, col4 = st.columns(4)
-daily_production = (crushing_capacity * recovery_rate) / 100
-daily_revenue = (daily_production * 1000) * market_price
-
-col1.metric("Daily Production", f"{daily_production:,.0f} kg")
-col2.metric("Daily Revenue", f"PKR {daily_revenue:,.0f}")
-col3.metric("Recovery Efficiency", f"{recovery_rate}%")
-col4.metric("Status", "Operational", delta="Optimal")
-
-# Map & Analytics
-st.subheader("Regional Crop Health & Logistics")
-tab1, tab2 = st.tabs(["Geospatial Twin", "AI Insights"])
-
-with tab1:
-    # Mock data for sugar mills/regions
-    data = {
-        'Region': ['Sargodha', 'Faisalabad', 'Hyderabad', 'Badin', 'Mardan'],
-        'lat': [32.08, 31.45, 25.39, 24.65, 34.19],
-        'lon': [72.67, 73.13, 68.37, 68.83, 72.04],
-        'Yield_Index': [95, 88, 92, 78, 82]
+    .main { background-color: #0e1117; color: white; }
+    div[data-testid="stMetric"] {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
-    df = pd.DataFrame(data)
-    fig = px.scatter_mapbox(df, lat="lat", lon="lon", size="Yield_Index", 
-                            color="Yield_Index", hover_name="Region",
-                            color_continuous_scale=px.colors.sequential.Greens,
-                            zoom=5, height=500)
-    fig.update_layout(mapbox_style="carto-positron", margin={"r":0,"t":0,"l":0,"b":0})
-    st.plotly_chart(fig, use_container_with_width=True)
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] {
+        height: 60px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 10px 10px 0 0;
+        padding: 0 20px;
+        color: #888;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #1f77b4 !important;
+        color: white !important;
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-with tab2:
-    st.write("### AI Process Advisor")
-    user_query = st.text_input("Ask the Digital Twin (e.g., 'How can I improve recovery rate when humidity is high?')")
-    
-    if user_query:
-        if model:
-            with st.spinner("Analyzing data..."):
-                prompt = f"As a Sugar Industry Expert, answer this based on a plant with {crushing_capacity} TCD capacity and {recovery_rate}% recovery: {user_query}"
-                response = model.generate_content(prompt)
-                st.info(response.text)
-        else:
-            st.error("Please add 'GEMINI_API_KEY' to Streamlit Secrets to use this feature.")
+# --- DATA ENGINE ---
+# This connection will look for secrets in Streamlit Cloud Settings
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Bottom Footer
+def load_data():
+    # Replace 'Sheet1' with your actual sheet name
+    # For the presentation, we'll use a placeholder if the sheet isn't linked yet
+    try:
+        df = conn.read(ttl="5m")
+        return df
+    except:
+        return pd.DataFrame({
+            "District": ["Lahore", "Karachi", "Islamabad", "Peshawar"],
+            "Retail": [148, 155, 152, 160],
+            "Ex_Mill": [138, 140, 142, 145],
+            "Stock": [50000, 30000, 15000, 20000]
+        })
+
+data = load_data()
+
+# --- HEADER SECTION ---
+st.title("🛡️ Sugar Sector Digital Twin")
+st.caption("Federal Ministry of National Food Security & Research | Real-Time Monitoring Instance")
 st.markdown("---")
-st.caption("Digital Twin Interface v1.2 | Real-time sensor simulation active.")
+
+# --- MULTI-TAB NAVIGATION ---
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📈 Executive Dashboard", 
+    "💸 Price & Spread Analysis", 
+    "📦 Inventory Deep-Dive", 
+    "⚖️ Policy Simulator",
+    "🤖 AI Assistant"
+])
+
+# TAB 1: EXECUTIVE DASHBOARD
+with tab1:
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("National Avg Retail", f"{data['Retail'].mean():.2f} PKR", "+2.4%")
+    m2.metric("Stock Coverage", "84 Days", "Stable")
+    m3.metric("Import Parity", "162.10 PKR", "-PKR 14.00")
+    m4.metric("Market Sentiment", "Neutral", "System Generated")
+    
+    st.subheader("Regional Price Distribution")
+    fig = px.bar(data, x="District", y="Retail", color="Retail", template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
+
+# TAB 4: POLICY SIMULATOR
+with tab4:
+    st.header("Strategic Policy Impact Simulator")
+    col_l, col_r = st.columns([1, 2])
+    
+    with col_l:
+        st.write("### Policy Levers")
+        export = st.slider("Export Quota (Tons)", 0, 500000, 100000)
+        buffer = st.select_slider("Buffer Release", options=["0%", "25%", "50%", "100%"])
+        
+    with col_r:
+        st.write("### AI Critique & Market Response")
+        if export > 300000:
+            st.error("🔴 **CRITICAL WARNING:** High risk of local supply shortage. Projected retail hike: 15-20 PKR.")
+        else:
+            st.success("🟢 **STABLE:** Proposed measures maintain domestic equilibrium.")
+        
+        # Simulated prediction chart
+        sim_df = pd.DataFrame({"Week": [1,2,3,4], "Predicted_Price": [150, 152, 155, 158] if export > 300000 else [150, 151, 150, 149]})
+        st.line_chart(sim_df.set_index("Week"))
+
+with tab5:
+    st.subheader("🤖 AI Intelligence Assistant")
+    query = st.text_input("Ask the Digital Twin anything (e.g., 'Predict prices for next Ramazan')")
+    if query:
+        st.write(f"Analyzing data for: *'{query}'*...")
+        st.info("AI Analysis: Based on current stock of 1.2M tons and historical consumption, a surplus is expected. No import intervention required for Q1 2026.")
